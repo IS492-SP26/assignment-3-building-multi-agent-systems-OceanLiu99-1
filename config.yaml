@@ -3,7 +3,7 @@
 
 system:
   name: "Multi-Agent Research Assistant"
-  topic: "HCI Research"  # Change this to your chosen topic
+  topic: "Generative Engine Optimization Research"  # Change this to your chosen topic
   max_iterations: 10
   timeout_seconds: 300
 
@@ -13,7 +13,12 @@ agents:
     enabled: true
     # Custom system prompt (optional - leave empty to use default)
     # If provided, ensure it includes the handoff signal: "PLAN COMPLETE"
-    system_prompt: ""  # Empty = use default prompt
+    system_prompt: "
+      You are an expert research planner specializing in Generative Engine Optimization topics.
+      Break down queries into specific, actionable research steps.
+      Focus on recent publications (last 5 years) and seminal works.
+      After creating the plan, say 'PLAN COMPLETE'.
+      "  # Empty = use default prompt
     # Example custom prompt:
     # system_prompt: |
     #   You are an expert research planner specializing in HCI topics.
@@ -26,7 +31,12 @@ agents:
     enabled: true
     # Custom system prompt (optional - leave empty to use default)
     # If provided, ensure it mentions tools and includes: "RESEARCH COMPLETE"
-    system_prompt: ""  # Empty = use default prompt
+    system_prompt: "
+      You are a research specialist in Generative Engine Optimization.
+      Use web_search() and paper_search() tools to gather evidence.
+      Prioritize peer-reviewed papers and authoritative sources.
+      After collecting 8-10 sources, say 'RESEARCH COMPLETE'.
+      "  # Empty = use default prompt
     max_sources: 10
     # Example custom prompt:
     # system_prompt: |
@@ -40,7 +50,12 @@ agents:
     enabled: true
     # Custom system prompt (optional - leave empty to use default)
     # If provided, ensure it includes: "DRAFT COMPLETE"
-    system_prompt: ""  # Empty = use default prompt
+    system_prompt: "
+      You are an academic writer specializing in Generative Engine Optimization research.
+      Synthesize findings with proper APA citations.
+      Write in a clear, engaging style accessible to students.
+      After completing the draft, say 'DRAFT COMPLETE'.
+      "  # Empty = use default prompt
     # Example custom prompt:
     # system_prompt: |
     #   You are an academic writer specializing in HCI research.
@@ -53,7 +68,12 @@ agents:
     enabled: true
     # Custom system prompt (optional - leave empty to use default)
     # If provided, ensure it includes: "APPROVED - RESEARCH COMPLETE" or "NEEDS REVISION"
-    system_prompt: ""  # Empty = use default prompt
+    system_prompt: "
+      You are a peer reviewer for Generative Engine Optimization research.
+      Evaluate for academic rigor, source quality, and clarity.
+      Be thorough but constructive in your feedback.
+      Say 'APPROVED - RESEARCH COMPLETE' or 'NEEDS REVISION'.
+      "  # Empty = use default prompt
     # Example custom prompt:
     # system_prompt: |
     #   You are a peer reviewer for HCI research.
@@ -79,7 +99,7 @@ models:
 tools:
   web_search:
     enabled: true
-    provider: "tavily"  # or "brave"
+    provider: "brave"  # "brave" or "tavily"
     max_results: 5
 
   paper_search:
