@@ -110,30 +110,59 @@ Please work together to answer this query comprehensively:
 3. Writer: Synthesize findings into a well-cited response
 4. Critic: Evaluate the quality and provide feedback"""
         
-        # Run the team
-        result = await self.team.run(task=task_message)
-        
-        # Extract conversation history
+        # Stream the team so we can print per-turn progress
+        import time
+        t0 = time.time()
+        print(f"[orchestrator] starting team.run_stream (max_rounds={max_rounds})", flush=True)
         messages = []
-        async for message in result.messages:
-            msg_dict = {
-                "source": message.source,
-                "content": message.content if hasattr(message, 'content') else str(message),
-            }
-            messages.append(msg_dict)
+        async for message in self.team.run_stream(task=task_message):
+            # The stream yields a mix of messages and the final TaskResult
+            source = getattr(message, "source", None)
+            content = getattr(message, "content", None)
+            if source is None and content is None:
+                # Final TaskResult; skip
+                continue
+            elapsed = time.time() - t0
+            preview = (str(content)[:120] + "…") if content and len(str(content)) > 120 else str(content)
+            print(f"[orchestrator] +{elapsed:5.1f}s [{source}] {preview}", flush=True)
+            messages.append({
+                "source": source,
+                "content": content if content is not None else str(message),
+            })
         
-        # Extract final response
+        # Extract final response. Prefer the most recent substantive Writer
+        # message; fall back to the longest non-signal message from any agent.
+        # Skip short approval/handoff signals like "APPROVED - RESEARCH COMPLETE"
+        # so the judge doesn't end up scoring an empty answer.
+        APPROVAL_TOKENS = ("APPROVED", "RESEARCH COMPLETE", "DRAFT COMPLETE", "PLAN COMPLETE")
+
+        def _is_signal(content) -> bool:
+            if not isinstance(content, str):
+                return True
+            stripped = content.strip()
+            if len(stripped) < 200 and any(tok in stripped.upper() for tok in APPROVAL_TOKENS):
+                return True
+            return False
+
         final_response = ""
-        if messages:
-            # Get the last message from Writer or Critic
-            for msg in reversed(messages):
-                if msg.get("source") in ["Writer", "Critic"]:
-                    final_response = msg.get("content", "")
-                    break
-        
-        # If no response found, use the last message
+        # 1) Last substantive Writer message
+        for msg in reversed(messages):
+            if msg.get("source") == "Writer" and not _is_signal(msg.get("content", "")):
+                final_response = msg.get("content", "")
+                break
+
+        # 2) Fall back to longest non-signal message from any agent
         if not final_response and messages:
-            final_response = messages[-1].get("content", "")
+            candidates = [
+                m.get("content", "") for m in messages
+                if isinstance(m.get("content"), str) and not _is_signal(m.get("content", ""))
+            ]
+            if candidates:
+                final_response = max(candidates, key=len)
+
+        # 3) Last resort: very last message, even if it's a signal
+        if not final_response and messages:
+            final_response = str(messages[-1].get("content", ""))
         
         return self._extract_results(query, messages, final_response)
 

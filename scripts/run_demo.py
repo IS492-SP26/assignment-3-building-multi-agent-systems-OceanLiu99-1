@@ -32,13 +32,18 @@ async def main(query: str) -> None:
     orchestrator = AutoGenOrchestrator(config)
     result = orchestrator.process_query(query)
 
-    print("[2/3] Judging the response...")
+    print(f"[1/3] done. Got {len(result.get('conversation_history', []))} messages, response len={len(result.get('response',''))}", flush=True)
+
+    print("[2/3] Judging the response (5 criteria, ~15-25s)...", flush=True)
     judge = LLMJudge(config)
+    import time
+    j0 = time.time()
     evaluation = await judge.evaluate(
         query=query,
         response=result.get("response", ""),
         sources=result.get("metadata", {}).get("sources", []),
     )
+    print(f"[2/3] judging done in {time.time()-j0:.1f}s", flush=True)
     result.setdefault("metadata", {})["evaluation"] = evaluation
 
     print("[3/3] Exporting artifacts...")

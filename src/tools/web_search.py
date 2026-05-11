@@ -35,13 +35,17 @@ class WebSearchTool:
         self.max_results = max_results
         self.logger = logging.getLogger("tools.web_search")
 
-        # Get API key from environment
+        # Get API key from environment. Fall back to whichever provider's key
+        # is set rather than raising — the LLM sometimes hallucinates provider
+        # names (e.g. "news", "google") and we don't want that to crash the run.
+        if provider not in ("tavily", "brave"):
+            self.logger.warning(f"Unknown provider '{provider}', falling back to default")
+            provider = _default_provider()
+            self.provider = provider
         if provider == "tavily":
             self.api_key = os.getenv("TAVILY_API_KEY")
-        elif provider == "brave":
+        else:  # brave
             self.api_key = os.getenv("BRAVE_API_KEY")
-        else:
-            raise ValueError(f"Unknown provider: {provider}")
 
         # Treat placeholder values (e.g. "your_brave_api_key_here") as missing
         if self.api_key and self.api_key.startswith("your_"):

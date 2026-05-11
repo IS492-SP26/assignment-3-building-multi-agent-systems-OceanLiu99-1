@@ -12,7 +12,7 @@ import os
 from typing import Dict, Any, List, Optional
 from autogen_agentchat.agents import AssistantAgent
 from autogen_agentchat.teams import RoundRobinGroupChat
-from autogen_agentchat.conditions import TextMentionTermination
+from autogen_agentchat.conditions import TextMentionTermination, MaxMessageTermination
 from autogen_core.tools import FunctionTool
 from autogen_ext.models.openai import OpenAIChatCompletionClient
 from autogen_core.models import ModelFamily
@@ -167,24 +167,42 @@ You have access to tools for web search and paper search. When conducting resear
     else:
         system_message = default_system_message
 
-    # Wrap tools in FunctionTool
+    # Wrap tools in FunctionTool. Paper search is only enabled when a
+    # SEMANTIC_SCHOLAR_API_KEY is set; otherwise we drop it from the tool list
+    # so the LLM doesn't burn a turn calling it and getting "no results".
     web_search_tool = FunctionTool(
         web_search,
         description="Search the web for articles, blog posts, and general information. Returns formatted search results with titles, URLs, and snippets."
     )
-    
-    paper_search_tool = FunctionTool(
-        paper_search,
-        description="Search academic papers on Semantic Scholar. Returns papers with authors, abstracts, citation counts, and URLs. Use year_from parameter to filter recent papers."
+    tools = [web_search_tool]
+
+    s2_key = os.getenv("SEMANTIC_SCHOLAR_API_KEY", "")
+    if s2_key and not s2_key.startswith("your_"):
+        tools.append(FunctionTool(
+            paper_search,
+            description="Search academic papers on Semantic Scholar. Returns papers with authors, abstracts, citation counts, and URLs. Use year_from parameter to filter recent papers."
+        ))
+
+    # Tighten the prompt so the model doesn't hallucinate other tool names
+    # (e.g. "browser.run", "google.search") which Groq rejects.
+    allowed_tools = ", ".join(f"`{t.name}`" for t in tools)
+    system_message += (
+        f"\n\nIMPORTANT: The ONLY tools you may call are {allowed_tools}. "
+        "Do not invent or call any other tool (no browser, no google, no news provider). "
+        "When calling `web_search`, omit the `provider` argument."
     )
 
-    # Create the researcher with tool access
+    # Create the researcher with tool access.
+    # reflect_on_tool_use=False stops AutoGen from making a second LLM call
+    # after each tool call (which Groq sometimes rejects when the model
+    # ignores tool_choice="none" and emits another tool call).
     researcher = AssistantAgent(
         name="Researcher",
         model_client=model_client,
-        tools=[web_search_tool, paper_search_tool],
+        tools=tools,
         description="Gathers evidence from web and academic sources using search tools",
         system_message=system_message,
+        reflect_on_tool_use=False,
     )
     
     return researcher
@@ -300,8 +318,12 @@ def create_research_team(config: Dict[str, Any]) -> RoundRobinGroupChat:
     writer = create_writer_agent(config, model_client)
     critic = create_critic_agent(config, model_client)
     
-    # Create termination condition
-    termination = TextMentionTermination("TERMINATE")
+    # Terminate as soon as any agent says "APPROVED" (Critic's approval signal,
+    # regardless of em-dash vs hyphen variants), or after a hard message cap.
+    termination = (
+        TextMentionTermination("APPROVED")
+        | MaxMessageTermination(16)
+    )
     
     # Create team with round-robin ordering
     team = RoundRobinGroupChat(

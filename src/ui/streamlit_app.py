@@ -41,14 +41,14 @@ def initialize_session_state():
     if 'history' not in st.session_state:
         st.session_state.history = []
 
-    if 'orchestrator' not in st.session_state:
-        config = load_config()
-        # Initialize AutoGen orchestrator
-        try:
-            st.session_state.orchestrator = AutoGenOrchestrator(config)
-        except Exception as e:
-            st.error(f"Failed to initialize orchestrator: {e}")
-            st.session_state.orchestrator = None
+    # NOTE: Do NOT cache the orchestrator in session_state. AutoGen's internal
+    # asyncio queues are bound to the event loop they were created on, and
+    # Streamlit creates a fresh loop on every rerun. Caching the orchestrator
+    # across reruns triggers "Queue is bound to a different event loop" on the
+    # second query. We build a fresh orchestrator per query inside
+    # `process_query` instead.
+    if 'config' not in st.session_state:
+        st.session_state.config = load_config()
 
     if 'show_traces' not in st.session_state:
         st.session_state.show_traces = False
@@ -66,19 +66,10 @@ async def process_query(query: str) -> Dict[str, Any]:
     Returns:
         Result dictionary with response, citations, and metadata
     """
-    orchestrator = st.session_state.orchestrator
-    
-    if orchestrator is None:
-        return {
-            "query": query,
-            "error": "Orchestrator not initialized",
-            "response": "Error: System not properly initialized. Please check your configuration.",
-            "citations": [],
-            "metadata": {}
-        }
-    
     try:
-        # Process query through AutoGen orchestrator
+        # Build a fresh orchestrator for each query so its asyncio queues are
+        # bound to the current event loop (see note in initialize_session_state).
+        orchestrator = AutoGenOrchestrator(st.session_state.config)
         result = orchestrator.process_query(query)
         
         # Check for errors
@@ -117,11 +108,14 @@ async def process_query(query: str) -> Dict[str, Any]:
 def extract_citations(result: Dict[str, Any]) -> list:
     """Extract citations from research result."""
     citations = []
-    
+
     # Look through conversation history for citations
     for msg in result.get("conversation_history", []):
         content = msg.get("content", "")
-        
+        # AutoGen tool-call/result messages have list content; coerce to text
+        if not isinstance(content, str):
+            content = str(content)
+
         # Find URLs in content
         import re
         urls = re.findall(r'https?://[^\s<>"{}|\\^`\[\]]+', content)
@@ -146,7 +140,9 @@ def extract_agent_traces(result: Dict[str, Any]) -> Dict[str, list]:
     
     for msg in result.get("conversation_history", []):
         agent = msg.get("source", "Unknown")
-        content = msg.get("content", "")[:200]  # First 200 chars
+        content = msg.get("content", "")
+        if not isinstance(content, str):
+            content = str(content)
         
         if agent not in traces:
             traces[agent] = []

@@ -4,7 +4,7 @@
 system:
   name: "Multi-Agent Research Assistant"
   topic: "Generative Engine Optimization Research"  # Change this to your chosen topic
-  max_iterations: 6
+  max_iterations: 3
   timeout_seconds: 300
 
 agents:
@@ -37,7 +37,7 @@ agents:
       Prioritize peer-reviewed papers and authoritative sources.
       After collecting 8-10 sources, say 'RESEARCH COMPLETE'.
       "  # Empty = use default prompt
-    max_sources: 10
+    max_sources: 3
     # Example custom prompt:
     # system_prompt: |
     #   You are a research specialist in HCI and UX design.
@@ -85,27 +85,27 @@ models:
   # Default model for agents (Groq)
   default:
     provider: "groq"
-    name: "llama-3.1-8b-instant"
+    name: "openai/gpt-oss-20b"
     temperature: 0.7
     max_tokens: 1024
 
   # Judge model for evaluation
   judge:
     provider: "groq"
-    name: "llama-3.1-8b-instant"
+    name: "openai/gpt-oss-20b"
     temperature: 0.3
-    max_tokens: 512
+    max_tokens: 1024
 
 tools:
   web_search:
     enabled: true
     provider: "brave"  # "brave" or "tavily"
-    max_results: 5
+    max_results: 3
 
   paper_search:
     enabled: true
     provider: "semantic_scholar"
-    max_results: 10
+    max_results: 3
 
   citation_extraction:
     enabled: true
