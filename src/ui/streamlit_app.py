@@ -178,15 +178,26 @@ def calculate_quality_score(result: Dict[str, Any]) -> float:
     return min(score, 10.0)  # Cap at 10
 
 
+def get_safety_events() -> list:
+    """Collect safety events from stored query results."""
+    events = []
+    for item in st.session_state.get("history", []):
+        metadata = item.get("result", {}).get("metadata", {})
+        events.extend(metadata.get("safety_events", []))
+        safety = metadata.get("safety")
+        if safety and not safety.get("safe", True):
+            events.append({
+                "type": "safety",
+                "action": safety.get("action", "refuse"),
+                "violations": safety.get("violations", []),
+                "safe": False,
+            })
+    return events
+
+
 def display_response(result: Dict[str, Any]):
     """
     Display query response.
-
-    TODO: YOUR CODE HERE
-    - Format response nicely
-    - Show citations with links
-    - Display sources
-    - Show safety events if any
     """
     # Check for errors
     if "error" in result:
@@ -215,9 +226,15 @@ def display_response(result: Dict[str, Any]):
         st.metric("Quality Score", f"{score:.2f}")
 
     # Safety events
+    safety = metadata.get("safety")
     safety_events = metadata.get("safety_events", [])
-    if safety_events:
+    if safety or safety_events:
         with st.expander("⚠️ Safety Events", expanded=True):
+            if safety:
+                status = "safe" if safety.get("safe", True) else "flagged"
+                st.warning(f"Safety status: {status} | Action: {safety.get('action', 'allow')}")
+                for violation in safety.get("violations", []):
+                    st.text(f"  • {violation.get('reason', 'Unknown')}")
             for event in safety_events:
                 event_type = event.get("type", "unknown")
                 action = event.get("action", "allow")
@@ -239,11 +256,6 @@ def display_response(result: Dict[str, Any]):
 def display_agent_traces(traces: Dict[str, Any]):
     """
     Display agent execution traces.
-
-    TODO: YOUR CODE HERE
-    - Format traces nicely
-    - Show agent workflow
-    - Display timing information
     """
     with st.expander("🔍 Agent Traces", expanded=False):
         for agent_name, actions in traces.items():
@@ -275,9 +287,9 @@ def display_sidebar():
 
         st.title("📊 Statistics")
 
-        # TODO: Get actual statistics
+        safety_events = get_safety_events()
         st.metric("Total Queries", len(st.session_state.history))
-        st.metric("Safety Events", 0)  # TODO: Get from safety manager
+        st.metric("Safety Events", len(safety_events))
 
         st.divider()
 
@@ -393,8 +405,19 @@ def main():
     if st.session_state.show_safety_log:
         st.divider()
         st.markdown("### 🛡️ Safety Event Log")
-        # TODO: Display safety events from safety manager
-        st.info("No safety events recorded.")
+        safety_events = get_safety_events()
+        if safety_events:
+            for event in safety_events:
+                violations = event.get("violations", [])
+                st.warning(
+                    f"{event.get('type', 'event').upper()} - "
+                    f"{event.get('action', 'allow').upper()} - "
+                    f"{len(violations)} violation(s)"
+                )
+                for violation in violations:
+                    st.text(f"  • {violation.get('reason', 'Unknown')}")
+        else:
+            st.info("No safety events recorded.")
 
 
 if __name__ == "__main__":

@@ -24,14 +24,6 @@ load_dotenv()
 class CLI:
     """
     Command-line interface for the research assistant.
-
-    TODO: YOUR CODE HERE
-    - Implement interactive prompt loop
-    - Display agent traces clearly
-    - Show citations and sources
-    - Indicate safety events (blocked/sanitized)
-    - Handle user commands (help, quit, clear, etc.)
-    - Format output nicely
     """
 
     def __init__(self, config_path: str = "config.yaml"):
@@ -78,13 +70,6 @@ class CLI:
     async def run(self):
         """
         Main CLI loop.
-
-        TODO: YOUR CODE HERE
-        - Implement interactive loop
-        - Handle user input
-        - Process queries through orchestrator
-        - Display results
-        - Handle errors gracefully
         """
         self._print_welcome()
 
@@ -204,11 +189,26 @@ class CLI:
             print(f"  • Messages exchanged: {metadata.get('num_messages', 0)}")
             print(f"  • Sources gathered: {metadata.get('num_sources', 0)}")
             print(f"  • Agents involved: {', '.join(metadata.get('agents_involved', []))}")
-            # TODO: Display safety events and refusal/sanitization status here
-            # Suggested implementation:
-            # - Read safety metadata returned by the orchestrator
-            # - Print which policy category was triggered
-            # - Show whether the response was refused or sanitized
+
+            safety = metadata.get("safety") or {}
+            safety_events = metadata.get("safety_events", [])
+            if safety or safety_events:
+                print("\n" + "-" * 70)
+                print("SAFETY")
+                print("-" * 70)
+                if safety:
+                    print(f"  • Status: {'safe' if safety.get('safe', True) else 'flagged'}")
+                    print(f"  • Action: {safety.get('action', 'allow')}")
+                    for violation in safety.get("violations", []):
+                        print(
+                            f"  • {violation.get('validator', 'policy')}: "
+                            f"{violation.get('reason', 'Policy violation')}"
+                        )
+                for event in safety_events:
+                    print(
+                        f"  • {event.get('type', 'event')}: "
+                        f"{'safe' if event.get('safe', True) else 'flagged'}"
+                    )
 
         # Display conversation summary if verbose mode
         if self._should_show_traces():
