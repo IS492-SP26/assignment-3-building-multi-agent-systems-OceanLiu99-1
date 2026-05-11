@@ -30,13 +30,6 @@ from .judge import LLMJudge
 class SystemEvaluator:
     """
     Evaluates the multi-agent system using test queries and LLM-as-a-Judge.
-
-    TODO: YOUR CODE HERE
-    - Load test queries from file
-    - Run system on all test queries
-    - Collect and aggregate results
-    - Generate evaluation report
-    - Perform error analysis
     """
 
     def __init__(self, config: Dict[str, Any], orchestrator=None):
@@ -76,13 +69,6 @@ class SystemEvaluator:
 
         Returns:
             Evaluation results and statistics
-
-        TODO: YOUR CODE HERE
-        - Load test queries
-        - Run system on each query
-        - Evaluate each response
-        - Aggregate results
-        - Generate report
         """
         # Check if evaluation is enabled in config.yaml
         if not self.enabled:
@@ -135,13 +121,9 @@ class SystemEvaluator:
         # Run through orchestrator if available
         if self.orchestrator:
             try:
-                # Call orchestrator's process_query method
-                # TODO: YOUR CODE HERE
-                # Need to implement this in their orchestrator
                 response_data = self.orchestrator.process_query(query)
-                
-                # If process_query is async, use:
-                # response_data = await self.orchestrator.process_query(query)
+                if inspect.isawaitable(response_data):
+                    response_data = await response_data
                 
             except Exception as e:
                 self.logger.error(f"Error processing query through orchestrator: {e}")
@@ -152,11 +134,10 @@ class SystemEvaluator:
                     "metadata": {"error": str(e)}
                 }
         else:
-            # Placeholder for testing without orchestrator
-            self.logger.warning("No orchestrator provided, using placeholder response")
+            self.logger.warning("No orchestrator provided, using fallback response")
             response_data = {
                 "query": query,
-                "response": "Placeholder response - orchestrator not connected",
+                "response": "No orchestrator is connected for this evaluation run.",
                 "citations": [],
                 "metadata": {"num_sources": 0}
             }
@@ -180,10 +161,6 @@ class SystemEvaluator:
     def _load_test_queries(self, path: str) -> List[Dict[str, Any]]:
         """
         Load test queries from JSON file.
-
-        TODO: YOUR CODE HERE
-        - Create test query dataset
-        - Load and validate queries
         """
         path_obj = Path(path)
         if not path_obj.exists():
@@ -192,6 +169,11 @@ class SystemEvaluator:
 
         with open(path_obj, 'r') as f:
             queries = json.load(f)
+
+        queries = [
+            query for query in queries
+            if isinstance(query, dict) and query.get("query")
+        ]
 
         # Limit number of queries if configured in config.yaml
         if self.max_test_queries and len(queries) > self.max_test_queries:
@@ -203,12 +185,6 @@ class SystemEvaluator:
     def _generate_report(self) -> Dict[str, Any]:
         """
         Generate evaluation report with statistics and analysis.
-
-        TODO: YOUR CODE HERE
-        - Calculate aggregate statistics
-        - Identify best/worst performing queries
-        - Analyze errors
-        - Generate visualizations (optional)
         """
         if not self.results:
             return {"error": "No results to report"}
@@ -263,6 +239,10 @@ class SystemEvaluator:
                 "query": worst_result.get("query", "") if worst_result else "",
                 "score": worst_result.get("evaluation", {}).get("overall_score", 0.0) if worst_result else 0.0
             } if worst_result else None,
+            "errors": [
+                {"query": result.get("query", ""), "error": result.get("error", "")}
+                for result in failed
+            ],
             "detailed_results": self.results
         }
 
@@ -271,11 +251,6 @@ class SystemEvaluator:
     def _save_results(self, report: Dict[str, Any]):
         """
         Save evaluation results to file.
-
-        TODO: YOUR CODE HERE
-        - Save detailed results
-        - Generate visualizations
-        - Create summary report
         """
         output_dir = Path("outputs")
         output_dir.mkdir(exist_ok=True)

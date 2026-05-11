@@ -28,13 +28,6 @@ from groq import Groq
 class LLMJudge:
     """
     LLM-based judge for evaluating system responses.
-
-    TODO: YOUR CODE HERE
-    - Implement LLM API calls for judging
-    - Create judge prompts for each criterion
-    - Parse judge responses into scores
-    - Aggregate scores across multiple criteria
-    - Handle multiple judges/perspectives
     """
 
     def __init__(self, config: Dict[str, Any]):
@@ -81,12 +74,6 @@ class LLMJudge:
 
         Returns:
             Dictionary with scores for each criterion and overall score
-
-        TODO: YOUR CODE HERE
-        - Implement LLM API calls
-        - Call judge for each criterion
-        - Parse and aggregate scores
-        - Provide detailed feedback
         """
         self.logger.info(f"Evaluating response for query: {query[:50]}...")
 
@@ -107,7 +94,6 @@ class LLMJudge:
 
             self.logger.info(f"Evaluating criterion: {criterion_name}")
 
-            # TODO: Implement actual LLM judging
             score = await self._judge_criterion(
                 criterion=criterion,
                 query=query,
@@ -117,6 +103,7 @@ class LLMJudge:
             )
 
             results["criterion_scores"][criterion_name] = score
+            results["feedback"].append(score.get("reasoning", ""))
             weighted_score += score.get("score", 0.0) * weight
 
         # Calculate overall score
@@ -144,11 +131,18 @@ class LLMJudge:
 
         Returns:
             Score and feedback for this criterion
-
-        This is a basic implementation using Groq API.
         """
         criterion_name = criterion.get("name", "unknown")
         description = criterion.get("description", "")
+
+        if not self.client:
+            return self._heuristic_score(
+                criterion_name=criterion_name,
+                query=query,
+                response=response,
+                sources=sources,
+                ground_truth=ground_truth,
+            )
 
         # Create judge prompt
         prompt = self._create_judge_prompt(
@@ -191,11 +185,6 @@ class LLMJudge:
     ) -> str:
         """
         Create a prompt for the judge LLM.
-
-        TODO: YOUR CODE HERE
-        - Create effective judge prompts
-        - Include clear scoring rubric
-        - Provide examples if helpful
         """
         prompt = f"""You are an expert evaluator. Evaluate the following response based on the criterion: {criterion_name}.
 
@@ -224,6 +213,42 @@ Provide your evaluation in the following JSON format:
 """
 
         return prompt
+
+    def _heuristic_score(
+        self,
+        criterion_name: str,
+        query: str,
+        response: str,
+        sources: Optional[List[Dict[str, Any]]],
+        ground_truth: Optional[str],
+    ) -> Dict[str, Any]:
+        """Fallback evaluator used when no judge API client is configured."""
+        response_lower = response.lower()
+        score = 0.6 if len(response.split()) >= 30 else 0.4
+
+        if criterion_name == "relevance":
+            query_terms = {w.lower().strip(".,?!") for w in query.split() if len(w) > 3}
+            if query_terms:
+                overlap = sum(1 for term in query_terms if term in response_lower)
+                score = min(1.0, 0.4 + overlap / max(len(query_terms), 1))
+        elif criterion_name == "evidence_quality":
+            score = 0.8 if sources or "http" in response_lower or "[" in response else 0.4
+        elif criterion_name == "completeness":
+            score = min(1.0, len(response.split()) / 150)
+        elif criterion_name == "accuracy" and ground_truth:
+            truth_terms = {
+                w.lower().strip(".,?!")
+                for w in ground_truth.split()
+                if len(w) > 3
+            }
+            overlap = sum(1 for term in truth_terms if term in response_lower)
+            score = min(1.0, 0.3 + overlap / max(len(truth_terms), 1))
+
+        return {
+            "score": max(0.0, min(1.0, score)),
+            "reasoning": "Heuristic fallback score because judge API is unavailable.",
+            "criterion": criterion_name,
+        }
 
     async def _call_judge_llm(self, prompt: str) -> str:
         """
