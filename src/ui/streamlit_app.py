@@ -20,6 +20,8 @@ from typing import Dict, Any
 from dotenv import load_dotenv
 
 from src.autogen_orchestrator import AutoGenOrchestrator
+from src.exporters import export_answer_markdown, export_session_json
+import json
 
 # Load environment variables
 load_dotenv()
@@ -251,6 +253,36 @@ def display_response(result: Dict[str, Any]):
         agent_traces = metadata.get("agent_traces", {})
         if agent_traces:
             display_agent_traces(agent_traces)
+
+    # Export buttons: auto-save to outputs/ and offer download
+    if response and "error" not in result:
+        st.markdown("### 📥 Export")
+        try:
+            session_path = export_session_json(result)
+            answer_path = export_answer_markdown(result, citations)
+            st.caption(f"Saved: `{session_path}` and `{answer_path}`")
+        except Exception as e:
+            st.caption(f"Auto-save failed: {e}")
+
+        col_a, col_b = st.columns(2)
+        with col_a:
+            st.download_button(
+                "Download session (JSON)",
+                data=json.dumps(result, indent=2, default=str),
+                file_name="session.json",
+                mime="application/json",
+            )
+        with col_b:
+            md_lines = [f"# Research Answer\n\n**Query:** {result.get('query','')}\n",
+                        "## Response\n", response, "\n## Sources\n"]
+            for i, c in enumerate(citations or [], 1):
+                md_lines.append(f"{i}. {c}")
+            st.download_button(
+                "Download answer (Markdown)",
+                data="\n".join(md_lines),
+                file_name="answer.md",
+                mime="text/markdown",
+            )
 
 
 def display_agent_traces(traces: Dict[str, Any]):

@@ -4,7 +4,7 @@
 system:
   name: "Multi-Agent Research Assistant"
   topic: "Generative Engine Optimization Research"  # Change this to your chosen topic
-  max_iterations: 10
+  max_iterations: 6
   timeout_seconds: 300
 
 agents:
@@ -84,17 +84,17 @@ agents:
 models:
   # Default model for agents (Groq)
   default:
-    provider: "vllm"
-    name: "openai/gpt-oss-20b"
+    provider: "groq"
+    name: "llama-3.1-8b-instant"
     temperature: 0.7
-    max_tokens: 2048
+    max_tokens: 1024
 
   # Judge model for evaluation
   judge:
-    provider: "vllm"
-    name: "openai/gpt-oss-20b"
+    provider: "groq"
+    name: "llama-3.1-8b-instant"
     temperature: 0.3
-    max_tokens: 1024
+    max_tokens: 512
 
 tools:
   web_search:

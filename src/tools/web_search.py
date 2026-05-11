@@ -43,6 +43,10 @@ class WebSearchTool:
         else:
             raise ValueError(f"Unknown provider: {provider}")
 
+        # Treat placeholder values (e.g. "your_brave_api_key_here") as missing
+        if self.api_key and self.api_key.startswith("your_"):
+            self.api_key = None
+
         if not self.api_key:
             self.logger.warning(f"No API key found for {provider}. Search will return empty results.")
 
@@ -123,7 +127,14 @@ class WebSearchTool:
         """
         try:
             import aiohttp
-            
+            import ssl
+            try:
+                import certifi
+                ssl_ctx = ssl.create_default_context(cafile=certifi.where())
+            except ImportError:
+                ssl_ctx = ssl.create_default_context()
+            connector = aiohttp.TCPConnector(ssl=ssl_ctx)
+
             url = "https://api.search.brave.com/res/v1/web/search"
             headers = {
                 "Accept": "application/json",
@@ -134,8 +145,8 @@ class WebSearchTool:
                 "q": query,
                 "count": self.max_results,
             }
-            
-            async with aiohttp.ClientSession() as session:
+
+            async with aiohttp.ClientSession(connector=connector) as session:
                 async with session.get(url, headers=headers, params=params) as response:
                     if response.status == 200:
                         data = await response.json()
@@ -211,8 +222,19 @@ class WebSearchTool:
         return [r for r in results if r.get("score", 0) >= min_score]
 
 
+def _default_provider() -> str:
+    """Pick the provider whose API key is actually set."""
+    brave = os.getenv("BRAVE_API_KEY", "")
+    tavily = os.getenv("TAVILY_API_KEY", "")
+    if brave and not brave.startswith("your_"):
+        return "brave"
+    if tavily and not tavily.startswith("your_"):
+        return "tavily"
+    return "brave"
+
+
 # Synchronous wrapper for use with AutoGen tools
-def web_search(query: str, provider: str = "tavily", max_results: int = 5) -> str:
+def web_search(query: str, provider: Optional[str] = None, max_results: int = 5) -> str:
     """
     Synchronous wrapper for web search (for AutoGen tool integration).
     
@@ -224,7 +246,7 @@ def web_search(query: str, provider: str = "tavily", max_results: int = 5) -> st
     Returns:
         Formatted string with search results
     """
-    tool = WebSearchTool(provider=provider, max_results=max_results)
+    tool = WebSearchTool(provider=provider or _default_provider(), max_results=max_results)
     results = asyncio.run(tool.search(query))
     
     if not results:

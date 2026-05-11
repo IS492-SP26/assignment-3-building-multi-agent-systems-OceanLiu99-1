@@ -41,14 +41,16 @@ def create_model_client(config: Dict[str, Any]) -> OpenAIChatCompletionClient:
             raise ValueError("GROQ_API_KEY not found in environment")
         
         return OpenAIChatCompletionClient(
-            model=model_config.get("name", "llama-3.3-70b-versatile"),
+            model=model_config.get("name", "openai/gpt-oss-20b"),
             api_key=api_key,
             base_url="https://api.groq.com/openai/v1",
-            model_capabilities={
-                "json_output": False,
+            model_info={
                 "vision": False,
                 "function_calling": True,
-            }
+                "json_output": True,
+                "family": ModelFamily.GPT_4O,
+                "structured_output": True,
+            },
         )
     
     # OpenAI configuration

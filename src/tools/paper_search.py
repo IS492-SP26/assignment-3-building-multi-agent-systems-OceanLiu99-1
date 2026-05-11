@@ -34,7 +34,10 @@ class PaperSearchTool:
 
         # API key is optional for Semantic Scholar
         self.api_key = os.getenv("SEMANTIC_SCHOLAR_API_KEY")
-        
+        # Treat placeholder values as missing so we don't send a bogus key
+        if self.api_key and self.api_key.startswith("your_"):
+            self.api_key = None
+
         if not self.api_key:
             self.logger.info("No Semantic Scholar API key found. Using anonymous access (lower rate limits)")
 
@@ -72,6 +75,13 @@ class PaperSearchTool:
             }
         """
         self.logger.info(f"Searching papers: {query}")
+
+        # Anonymous Semantic Scholar access is heavily rate-limited and often
+        # returns 429s that the library wraps as ConnectionRefusedError after
+        # retries. Skip the call entirely without a key to keep the workflow fast.
+        if not self.api_key:
+            self.logger.warning("Skipping paper search: no SEMANTIC_SCHOLAR_API_KEY set")
+            return []
 
         try:
             from semanticscholar import SemanticScholar

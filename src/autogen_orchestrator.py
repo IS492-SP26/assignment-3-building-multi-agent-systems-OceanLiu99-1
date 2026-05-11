@@ -46,7 +46,7 @@ class AutoGenOrchestrator:
         # Workflow trace for debugging and UI display
         self.workflow_trace: List[Dict[str, Any]] = []
 
-    def process_query(self, query: str, max_rounds: int = 20) -> Dict[str, Any]:
+    def process_query(self, query: str, max_rounds: int = 8) -> Dict[str, Any]:
         """
         Process a research query through the multi-agent system.
 
@@ -90,7 +90,7 @@ class AutoGenOrchestrator:
                 "metadata": {"error": True}
             }
     
-    async def _process_query_async(self, query: str, max_rounds: int = 20) -> Dict[str, Any]:
+    async def _process_query_async(self, query: str, max_rounds: int = 8) -> Dict[str, Any]:
         """
         Async implementation of query processing.
         
