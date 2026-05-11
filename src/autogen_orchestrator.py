@@ -268,7 +268,8 @@ def demonstrate_usage():
     print(orchestrator.visualize_workflow())
     
     # Example query
-    query = "What are the latest trends in human-computer interaction research?"
+    # query = "What are the latest trends in human-computer interaction research?"
+    query = "What are the latest trends in Generative Engine Optimization research?"
     
     print(f"\nProcessing query: {query}\n")
     print("=" * 70)
