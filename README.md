@@ -7,8 +7,8 @@ A four-agent deep-research assistant for **Generative Engine Optimization (GEO)*
 See `REPORT.md` for the full technical write-up.
 
 ## Demo
-![alt text](image.png)
-![alt text](image-1.png)
+![alt text](docs/image.png)
+![alt text](docs/image-1.png)
 
 ## Project Structure
 
